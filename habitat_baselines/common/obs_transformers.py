@@ -39,6 +39,7 @@ from habitat_baselines.utils.common import (
     get_image_height_width,
     image_resize_shortest_edge,
     overwrite_gym_box_shape,
+    image_resize,
 )
 
 
@@ -1187,6 +1188,80 @@ class Equirect2CubeMap(ProjectionTransformer):
                 eq2cube_config.WIDTH,
             ),
             target_uuids=target_uuids,
+        )
+
+@baseline_registry.register_obs_transformer()
+class Resize(ObservationTransformer):
+    r"""An nn module that resizes the input.
+    This module assumes that all images in the batch are of the same size.
+    """
+
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        channels_last: bool = True,
+        trans_keys: Tuple[str] = ("rgb", "depth", "semantic"),
+    ):
+        """Args:
+        size: The size you want to resize to
+        channels_last: indicates if channels is the last dimension
+        """
+        super(Resize, self).__init__()
+        self._width: int = width
+        self._height: int = height
+        self.channels_last: bool = channels_last
+        self.trans_keys: Tuple[str] = trans_keys
+
+    def transform_observation_space(
+        self,
+        observation_space: spaces.Dict,
+    ):
+        width = self._width
+        height = self._height
+        observation_space = copy.deepcopy(observation_space)
+        if width and height:
+            for key in observation_space.spaces:
+                if key in self.trans_keys:
+                    # In the observation space dict, the channels are always last
+                    h, w = get_image_height_width(
+                        observation_space.spaces[key], channels_last=True
+                    )
+                    new_size = (height, width)
+                    logger.info(
+                        "Resizing observation of %s: from %s to %s"
+                        % (key, (h, w), new_size)
+                    )
+                    observation_space.spaces[key] = overwrite_gym_box_shape(
+                        observation_space.spaces[key], new_size
+                    )
+        return observation_space
+
+    def _transform_obs(self, obs: torch.Tensor) -> torch.Tensor:
+        return image_resize(
+            obs, self._width, self._height, channels_last=self.channels_last
+        )
+
+    @torch.no_grad()
+    def forward(
+        self, observations: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        if self._width is not None and self._height is not None:
+            observations.update(
+                {
+                    sensor: self._transform_obs(observations[sensor])
+                    for sensor in self.trans_keys
+                    if sensor in observations
+                }
+            )
+        return observations
+
+    @classmethod
+    def from_config(cls, config: Config):
+        resize_config = config.RL.POLICY.OBS_TRANSFORMS.RESIZE
+        return cls(
+            resize_config.WIDTH,
+            resize_config.HEIGHT,
         )
 
 
