@@ -14,7 +14,7 @@ parser.add_argument("--mode", type=str, help="Input Mode (rgb, depth, rgbd)", de
 args = parser.parse_args()
 
 app = Flask(__name__)
-run_with_ngrok(app) 
+#run_with_ngrok(app) 
 possible_actions = ["Stop", "MoveForward", "TurnLeft", "TurnRight"]
 
 #rgb_agent = PointNavAgent("models/trained/rgb-10mio.pth", "data/configs/ppo_pointnav_mp3d.yaml", "rgb")
@@ -83,4 +83,4 @@ def get_depth(request):
     depth = np.expand_dims(depth, axis=2)
     return depth
 
-app.run()
+app.run(port=5000)
