@@ -27,7 +27,7 @@ import time
 
 
 class PointNavAgent:
-    def __init__(self, model_path: str, config_path, input_type: str = "rgb") -> None:
+    def __init__(self, model_path: str, config_path, input_type: str = "rgbd") -> None:
         ckpt_dict = torch.load(model_path, map_location="cpu")
         start_config = get_config(config_path)
         self.config = self.setup_eval_config(ckpt_dict["config"], start_config)

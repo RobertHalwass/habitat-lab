@@ -7,19 +7,12 @@ import argparse
 import torchvision.transforms as transforms
 import time
 
-parser = argparse.ArgumentParser(description="Webserver")
-parser.add_argument("--model", type=str, help="Model Path", dest="model", default="models/trained/hm3d.pth")
-parser.add_argument("--config", type=str, help="Config Path", dest="config", default="data/configs/ppo_pointnav_hm3d.yaml")
-parser.add_argument("--mode", type=str, help="Input Mode (rgb, depth, rgbd)", dest="mode", default="rgbd")
-args = parser.parse_args()
-
 app = Flask(__name__)
-#run_with_ngrok(app) 
+run_with_ngrok(app) 
 possible_actions = ["Stop", "MoveForward", "TurnLeft", "TurnRight"]
 
-#rgb_agent = PointNavAgent("models/trained/rgb-10mio.pth", "data/configs/ppo_pointnav_mp3d.yaml", "rgb")
-#depth_agent = PointNavAgent("models/trained/depth-10mio.pth", "data/configs/ppo_pointnav_mp3d.yaml", "depth")
-rgb_depth_agent = PointNavAgent(args.model, args.config, args.mode)
+mp3d_gibson_agent = PointNavAgent("models/trained/mp3d+gibson.pth", "data/configs/ppo_pointnav_gibson.yaml")
+hm3d_agent = PointNavAgent("models/trained/hm3d.pth", "data/configs/ppo_pointnav_gibson.yaml")
 
 @app.route("/")
 def index():
@@ -33,34 +26,28 @@ def alive():
 def ready():
     return jsonify(backend="ready")
 
-# @app.route("/rgb", methods=["POST"])
-# def rgb():
-#     rgb = get_rgb(request)
-#     pointgoal = get_pointgoal(request)
-#     action = rgb_agent.act({"rgb": rgb, "pointgoal_with_gps_compass": pointgoal})
-#     return possible_actions[action]
-
-# @app.route("/depth", methods=["POST"])
-# def depth():
-#     depth = get_depth(request)
-#     pointgoal = get_pointgoal(request)
-#     action = depth_agent.act({"depth": depth, "pointgoal_with_gps_compass": pointgoal})["action"]
-#     return possible_actions[action]
-
-@app.route("/rgb-depth", methods=["POST"])
-def rgb_depth():
+@app.route("/mp3d+gibson", methods=["POST"])
+def mp3d_gibson():
     rgb = get_rgb(request)
     depth = get_depth(request)
     pointgoal = get_pointgoal(request)
     observation = {"rgb": rgb, "depth": depth, "pointgoal_with_gps_compass": pointgoal}
-    action = rgb_depth_agent.act([observation])
+    action = mp3d_gibson_agent.act([observation])
+    return possible_actions[action]
+
+@app.route("/hm3d", methods=["POST"])
+def hm3d():
+    rgb = get_rgb(request)
+    depth = get_depth(request)
+    pointgoal = get_pointgoal(request)
+    observation = {"rgb": rgb, "depth": depth, "pointgoal_with_gps_compass": pointgoal}
+    action = hm3d_agent.act([observation])
     return possible_actions[action]
 
 @app.route("/reset")
 def reset():
-    # rgb_agent.reset()
-    # depth_agent.reset()
-    rgb_depth_agent.reset()
+    mp3d_gibson_agent.reset()
+    hm3d_agent.reset()
     return "Agents Reset" 
 
 def get_pointgoal(request):
@@ -83,4 +70,4 @@ def get_depth(request):
     depth = np.expand_dims(depth, axis=2)
     return depth
 
-app.run(port=5000)
+app.run()
